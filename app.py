@@ -22,37 +22,39 @@ def neg_log10(x):
 df = pd.read_csv('UbiSiteDDA.csv')
 
 df['gene+pos'] = df['Gene names'] + "-K" + df['Positions within proteins'].astype(str)
-df_tak = df[df['TAK Difference (log2)'].notnull()]
-df_mg = df[df['MG Difference (log2)'].notnull()]
-df_pr = df[df['PR Difference (log2)'].notnull()]
 
 # Columns in data
-p_cols = ['TAK -Log p-value', 'MG -Log p-value', 'PR -Log p-value']
-fc_cols = ['TAK Difference (log2)', 'MG Difference (log2)', 'PR Difference (log2)']
-df_all = df.drop(['Proteins', 'Protein names',
-                  'TAK Significant (FDR=0.05 S0=0.1)', 'TAK q-value',
-                  'TAK all sites average',
-                  'MG Significant (FDR=0.05 S0=0.1)', 'MG q-value',
-                  'MG all sites average',
-                  'PR Significant (FDR=0.05 S0=0.1)', 'PR q-value',
-                  'PR all sites average', 'Ub Enzyme', 'Enzyme',
-                  'Protein in His10Ub', 'PEP', 'Delta score',
-                  'gene+pos'], axis=1).copy()
+df_selected = df.drop(['Proteins', 'Protein names',
+                       'TAK Significant (FDR=0.05 S0=0.1)', 'TAK q-value',
+                       'TAK all sites average',
+                       'MG Significant (FDR=0.05 S0=0.1)', 'MG q-value',
+                       'MG all sites average',
+                       'PR Significant (FDR=0.05 S0=0.1)', 'PR q-value',
+                       'PR all sites average', 'Ub Enzyme', 'Enzyme',
+                       'Protein in His10Ub', 'PEP', 'Delta score', ], axis=1).copy()
 
-df_all.rename(columns={'TAK -Log p-value': 'TAK243 p', 'TAK Difference (log2)': 'TAK243 fc',
-                       'PR -Log p-value': 'PR619 p', 'PR Difference (log2)': 'PR619 fc',
-                       'MG -Log p-value': 'MG132 p', 'MG Difference (log2)': 'MG132 fc',
-                       'Score for localization': 'Pos. Score', 'Sequence window': 'Sequence',
-                       'Positions within proteins': 'Lysine', 'Gene names': 'Gene'
-                       }, inplace=True)
+df_selected.rename(columns={'TAK -Log p-value': 'TAK243 p', 'TAK Difference (log2)': 'TAK243 fc',
+                            'PR -Log p-value': 'PR619 p', 'PR Difference (log2)': 'PR619 fc',
+                            'MG -Log p-value': 'MG132 p', 'MG Difference (log2)': 'MG132 fc',
+                            'Score for localization': 'Pos. Score', 'Sequence window': 'Sequence',
+                            'Positions within proteins': 'Lysine', 'Gene names': 'Gene'
+                            }, inplace=True)
+
+p_cols = ['TAK243 p', 'MG132 p', 'PR619 p']
+fc_cols = ['TAK243 fc', 'MG132 fc', 'PR619 fc']
 
 # Transform p-values
-df_tak_p = df_tak.apply(lambda x: power_to_transform(x) if x.name in p_cols else x)
-df_tak_p.reset_index(inplace=True)
-df_mg_p = df_mg.apply(lambda x: power_to_transform(x) if x.name in p_cols else x)
-df_mg_p.reset_index(inplace=True)
-df_pr_p = df_pr.apply(lambda x: power_to_transform(x) if x.name in p_cols else x)
-df_pr_p.reset_index(inplace=True)
+for col in p_cols:
+    df_selected[col + '_x'] = df_selected[col].apply(lambda x: power_to_transform(x))
+df_selected.reset_index(inplace=True)
+
+df_tak, df_mg, df_pr = df_selected[df_selected['TAK243 fc'].notnull()], df_selected[df_selected['MG132 fc'].notnull()], \
+                       df_selected[df_selected['PR619 fc'].notnull()]
+df_tak.reset_index(inplace=True)
+df_mg.reset_index(inplace=True)
+df_pr.reset_index(inplace=True)
+
+p_cols_x = ['TAK243 p_x', 'MG132 p_x', 'PR619 p_x']
 
 # Initialize dashboard
 app = dash.Dash(
@@ -65,9 +67,10 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             html.H2('UbiSite DDA Data',
-                    className='text-center text-primary, mb-4'),
-        ])
+                    className='text-center col-12'),
+        ]),
     ]),
+
     # Input field
     dbc.Row([
         dbc.Col([
@@ -94,6 +97,16 @@ app.layout = dbc.Container([
                     color="danger",
                     dismissable=True,
                     id='err',
+                ),
+                dbc.Alert(
+                    html.H6("Gene Name found", className='text-center'),
+                    className='col-3 position-relative"',
+                    is_open=False,
+                    fade=True,
+                    color="success",
+                    dismissable=True,
+                    id='success',
+                    duration=2000,
                 )
             ])
         ]),
@@ -103,7 +116,7 @@ app.layout = dbc.Container([
         # TAK
         dbc.Col(
             html.Div([
-                html.H3(children='Conjugation Inhibition',
+                html.H4(children='Conjugation Inhibition',
                         className='text-center text-primary, mb-4',
                         style={'margin-right': '2px', 'margin-left': '2px'},
                         id='tak-title'
@@ -119,9 +132,9 @@ app.layout = dbc.Container([
                     tooltip={'always_visible': True},
                     id='tak-volcanoplot-input_p',
                     min=0,
-                    max=max(df_tak['TAK -Log p-value']),
+                    max=max(df_tak['TAK243 p']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_tak['TAK -Log p-value'])))},
+                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_tak['TAK243 p'])))},
                     value=1.3
                 ),
                 # Fold Change slider TAK
@@ -129,11 +142,11 @@ app.layout = dbc.Container([
                 dcc.RangeSlider(
                     tooltip={'always_visible': True},
                     id='tak-volcanoplot-input_fc',
-                    min=min(df_tak_p['TAK Difference (log2)']),
-                    max=max(df_tak_p['TAK Difference (log2)']),
+                    min=min(df_tak['TAK243 fc']),
+                    max=max(df_tak['TAK243 fc']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_tak_p['TAK Difference (log2)'])),
-                                                               math.ceil(max(df_tak_p['TAK Difference (log2)'])))},
+                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_tak['TAK243 fc'])),
+                                                               math.ceil(max(df_tak['TAK243 fc'])))},
                     value=[-2, 2]
                 ),
                 # Volcano TAK
@@ -144,7 +157,7 @@ app.layout = dbc.Container([
         # MG
         dbc.Col(
             html.Div([
-                html.H3(children='Proteasome Inhibition',
+                html.H4(children='Proteasome Inhibition',
                         className='text-center text-primary, mb-4',
                         id='mg-title'),
                 dbc.Tooltip(
@@ -158,9 +171,9 @@ app.layout = dbc.Container([
                     tooltip={'always_visible': True},
                     id='mg-volcanoplot-input_p',
                     min=0,
-                    max=max(df_mg['MG -Log p-value']),
+                    max=max(df_mg['MG132 p']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_mg['MG -Log p-value'])))},
+                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_mg['MG132 p'])))},
                     value=1.3
                 ),
                 # Fold Change slider MG
@@ -168,11 +181,11 @@ app.layout = dbc.Container([
                 dcc.RangeSlider(
                     tooltip={'always_visible': True},
                     id='mg-volcanoplot-input_fc',
-                    min=min(df_mg_p['MG Difference (log2)']),
-                    max=max(df_mg_p['MG Difference (log2)']),
+                    min=min(df_mg['MG132 fc']),
+                    max=max(df_mg['MG132 fc']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_mg_p['MG Difference (log2)'])),
-                                                               math.ceil(max(df_mg_p['MG Difference (log2)'])))},
+                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_mg['MG132 fc'])),
+                                                               math.ceil(max(df_mg['MG132 fc'])))},
                     value=[-2, 2]
                 ),
                 # Volcano MG
@@ -183,7 +196,7 @@ app.layout = dbc.Container([
         # PR
         dbc.Col(
             html.Div([
-                html.H3(children='DUB Inhibition',
+                html.H4(children='DUB Inhibition',
                         className='text-center text-primary, mb-4',
                         id='pr-title'),
                 dbc.Tooltip(
@@ -197,9 +210,9 @@ app.layout = dbc.Container([
                     tooltip={'always_visible': True},
                     id='pr-volcanoplot-input_p',
                     min=0,
-                    max=max(df_pr['PR -Log p-value']),
+                    max=max(df_pr['PR619 p']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_pr['PR -Log p-value'])))},
+                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_pr['PR619 p'])))},
                     value=1.3
                 ),
                 # Fold Change slider PR
@@ -207,11 +220,11 @@ app.layout = dbc.Container([
                 dcc.RangeSlider(
                     tooltip={'always_visible': True},
                     id='pr-volcanoplot-input_fc',
-                    min=min(df_pr_p['PR Difference (log2)']),
-                    max=max(df_pr_p['PR Difference (log2)']),
+                    min=min(df_pr['PR619 fc']),
+                    max=max(df_pr['PR619 fc']),
                     step=0.1,
-                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_pr_p['PR Difference (log2)'])),
-                                                               math.ceil(max(df_pr_p['PR Difference (log2)'])))},
+                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_pr['PR619 fc'])),
+                                                               math.ceil(max(df_pr['PR619 fc'])))},
                     value=[-2, 2]
                 ),
                 # Volcano PR
@@ -227,7 +240,9 @@ app.layout = dbc.Container([
                 html.Br(),
                 dash_table.DataTable(
                     id='poi-table',
-                    columns=[{"name": i, "id": i} for i in df_all.columns],
+                    columns=[{"name": i, "id": i} for i in ['Lysine', 'Gene', 'TAK243 p', 'TAK243 fc', 'MG132 p',
+                                                            'MG132 fc', 'PR619 p', 'PR619 fc', 'Score', 'Pos. Score',
+                                                            'Sequence']],
                     style_table={'height': '300px', 'overflowY': 'auto'},
                     page_action='none',
                     sort_action='custom',
@@ -258,163 +273,102 @@ app.layout = dbc.Container([
                     },
                     tooltip_delay=0,
                     tooltip_duration=None
-                )
+                ),
             ])
         ])
-    ])
-])
+    ]),
+    # References
+    dbc.Row([
+        dbc.Col([
+            html.A('Github repository',
+                     href='https://github.com/Trulsson/Dynamic-ub-site-dashboard'),
+        ]),
+        dbc.Col([
+            html.A('Trulsson et al. Nat Commun 13. (2022)',
+                     href='https://www.nature.com/articles/s41467-022-30376-7'),
+        ]),
+    ]), html.Br(),
+],className="m-auto")
 
 
 @app.callback(
     Output('err', 'is_open'),
+    Output('success', 'is_open'),
     Output('gene_input', 'value'),
     Input('gene_input', 'value'),
     State("err", "is_open")
 )
 def check_input(input_gene, is_open):
+    # Makes sure there is an input and then checks if
+    # the input Gene of interest is present in the data
     if input_gene is None:
-        return no_update, no_update
+        return no_update, no_update, no_update
     print("Search for Gene: ", input_gene)
-    poi = df_all[df_all['Gene'].str.contains(input_gene.upper()) == True]
+    poi = df_selected[df_selected['Gene'].str.contains(input_gene.upper()) == True]
     if len(poi.index) == 0:
         is_open = True
-        return is_open, no_update
-    is_open = False
-    return is_open, input_gene
+        return is_open, no_update, no_update
+    is_open = True
+    return no_update, is_open, no_update
 
 
 @app.callback(
     Output('ubisite-tak-volcanoplot', 'figure'),
+    Output('ubisite-mg-volcanoplot', 'figure'),
+    Output('ubisite-pr-volcanoplot', 'figure'),
     Input('tak-volcanoplot-input_p', 'value'),
     Input('tak-volcanoplot-input_fc', 'value'),
-    Input('gene_input', 'value')
-)
-def update_volcanoplot_tak(p_val, fc, input_gene):
-    fig = dashbio.VolcanoPlot(
-        dataframe=df_tak_p,
-        effect_size='TAK Difference (log2)',
-        p='TAK -Log p-value',
-        gene='gene+pos',
-        point_size=8,
-        xlabel='Log2 Difference',
-        effect_size_line=fc,
-        genomewideline_value=p_val,
-        highlight_color='#119DFF',
-        col='#2A3F5F',
-        snp='gene+pos',
-    )
-    # Hover data information
-    single_gene_names = []
-    for i, string in enumerate(df_tak_p['gene+pos']):
-        single_gene_names.append(string.split(';', 1)[0])
-    customdata = np.stack((single_gene_names, df_tak_p['Score']), axis=-1)
-    hovertemplate = '<b>Gene: %{customdata[0]}</b> <br>Fold Change: %{x} <br>p-value: %{y} <br>Score:%{customdata[1]}'
-    fig.update_traces(customdata=customdata, hovertemplate=hovertemplate)
-
-    # Figure layout
-    fig.update_layout(showlegend=False, title_text=None,
-                      margin={'l': 10, 'r': 10, 'b': 30, 't': 30, 'pad': 4},
-                      )
-
-    # Update graph with Gene of interest
-    if input_gene:
-        p_vals = df_tak['TAK -Log p-value'].loc[df_tak['Gene names'].str.contains(input_gene.upper()) == True]
-        folds = df_tak['TAK Difference (log2)'].loc[df_tak['Gene names'].str.contains(input_gene.upper()) == True]
-        name = df_tak['gene+pos'].loc[df_tak['Gene names'].str.contains(input_gene.upper()) == True]
-        texts = []
-        for fold, p, name in zip(folds, p_vals, name):
-            texts.append(fig.add_annotation(x=fold, y=p, text=name, bgcolor=(
-                '#69b8f0' if (p > p_val) and any([(fold < fc[0]), (fold > fc[1])]) else 'white')))
-
-    return fig
-
-
-@app.callback(
-    Output('ubisite-mg-volcanoplot', 'figure'),
     Input('mg-volcanoplot-input_p', 'value'),
     Input('mg-volcanoplot-input_fc', 'value'),
-    Input('gene_input', 'value')
-)
-def update_volcanoplot_mg(p_val, fc, input_gene):
-    fig = dashbio.VolcanoPlot(
-        dataframe=df_mg_p,
-        effect_size='MG Difference (log2)',
-        p='MG -Log p-value',
-        gene='gene+pos',
-        point_size=8,
-        xlabel='Log2 Difference',
-        effect_size_line=fc,
-        genomewideline_value=p_val,
-        highlight_color='#119DFF',
-        col='#2A3F5F',
-        snp='Sequence window',
-        annotation='Score'
-    )
-    # Hover data information
-    single_gene_names = []
-    for i, string in enumerate(df_mg_p['gene+pos']):
-        single_gene_names.append(string.split(';', 1)[0])
-    customdata = np.stack((single_gene_names, df_mg_p['Score']), axis=-1)
-    hovertemplate = '<b>Gene: %{customdata[0]}</b> <br>Fold Change: %{x} <br>p-value: %{y} <br>Score:%{customdata[1]}'
-    fig.update_traces(customdata=customdata, hovertemplate=hovertemplate)
-
-    # Figure layout
-    fig.update_layout(showlegend=False, title_text=None, margin={'l': 10, 'r': 10, 'b': 30, 't': 30, 'pad': 4})
-
-    # Update graph with Gene of interest
-    if input_gene:
-        p_vals = df_mg['MG -Log p-value'].loc[df_mg['Gene names'].str.contains(input_gene.upper()) == True]
-        folds = df_mg['MG Difference (log2)'].loc[df_mg['Gene names'].str.contains(input_gene.upper()) == True]
-        name = df_mg['gene+pos'].loc[df_mg['Gene names'].str.contains(input_gene.upper()) == True]
-        texts = []
-        for fold, p, name in zip(folds, p_vals, name):
-            texts.append(fig.add_annotation(x=fold, y=p, text=name, bgcolor='white'))
-
-    return fig
-
-
-@app.callback(
-    Output('ubisite-pr-volcanoplot', 'figure'),
     Input('pr-volcanoplot-input_p', 'value'),
     Input('pr-volcanoplot-input_fc', 'value'),
     Input('gene_input', 'value')
 )
-def update_volcanoplot_pr(p_val, fc, input_gene):
-    fig = dashbio.VolcanoPlot(
-        dataframe=df_pr_p,
-        effect_size='PR Difference (log2)',
-        p='PR -Log p-value',
-        gene='gene+pos',
-        point_size=8,
-        xlabel='Log2 Difference',
-        effect_size_line=fc,
-        genomewideline_value=p_val,
-        highlight_color='#119DFF',
-        col='#2A3F5F',
-        snp='Sequence window',
-        annotation='Score'
-    )
-    # Hover data information
-    single_gene_names = []
-    for i, string in enumerate(df_pr_p['gene+pos']):
-        single_gene_names.append(string.split(';', 1)[0])
-    customdata = np.stack((single_gene_names, df_pr_p['Score']), axis=-1)
-    hovertemplate = '<b>Gene: %{customdata[0]}</b> <br>Fold Change: %{x} <br>p-value: %{y} <br>Score:%{customdata[1]}'
-    fig.update_traces(customdata=customdata, hovertemplate=hovertemplate)
+def update_volcanoplot_tak(p_val_tak, fc_tak, p_val_mg, fc_mg, p_val_pr, fc_pr, input_gene):
+    p_val = [p_val_tak, p_val_mg, p_val_pr]
+    fc = [fc_tak, fc_mg, fc_pr]
+    # No NaN values in volcanoes
+    dfs = [df_tak, df_mg, df_pr]
+    figs = []
+    for p, f, data, p_col_x, fc_col, p_col in zip(p_val, fc, dfs, p_cols_x, fc_cols, p_cols):
+        fig = dashbio.VolcanoPlot(
+            dataframe=data,
+            effect_size=fc_col,
+            p=p_col_x,
+            gene='gene+pos',
+            point_size=8,
+            xlabel='Log2 Difference',
+            effect_size_line=f,
+            genomewideline_value=p,
+            highlight_color='#119DFF',
+            col='#2A3F5F',
+            snp='Score',
+        )
+        # Hover data information, order of stack not the same as plot order. Not functional atm, default hover enabled.
+        # single_gene_names = []
+        # for string in :
+        #     single_gene_names.append(string.split(';', 1)[0])
+        # customdata = np.stack((data['gene+pos'], data['Score'], data[p_col_x], data[fc_col]), axis=-1)
+        # hovertemplate = '<b>Gene: %{customdata[0]}</b> <br>Fold Change: %{customdata[3]} <br>p-value: %{customdata[2]} <br>Score:%{customdata[1]}'
+        # fig.update_traces(customdata=customdata, hovertemplate=hovertemplate)
 
-    # Figure layout
-    fig.update_layout(showlegend=False, title_text=None, margin={'l': 10, 'r': 10, 'b': 30, 't': 30, 'pad': 4})
+        # Figure layout
+        fig.update_layout(showlegend=False, title_text=None,
+                          margin={'l': 10, 'r': 10, 'b': 30, 't': 30, 'pad': 4},
+                          )
 
-    # Update graph with Gene of interest
-    if input_gene:
-        p_vals = df_pr['PR -Log p-value'].loc[df_pr['Gene names'].str.contains(input_gene.upper()) == True]
-        folds = df_pr['PR Difference (log2)'].loc[df_pr['Gene names'].str.contains(input_gene.upper()) == True]
-        name = df_pr['gene+pos'].loc[df_pr['Gene names'].str.contains(input_gene.upper()) == True]
-        texts = []
-        for fold, p, name in zip(folds, p_vals, name):
-            texts.append(fig.add_annotation(x=fold, y=p, text=name, bgcolor='white'))
+        # Update graph with Protein of interest
+        if input_gene:
+            p_vals_poi = data[p_col].loc[data['Gene'].str.contains(input_gene.upper()) == True]
+            folds_poi = data[fc_col].loc[data['Gene'].str.contains(input_gene.upper()) == True]
+            names = data['gene+pos'].loc[data['Gene'].str.contains(input_gene.upper()) == True]
 
-    return fig
+            texts = []
+            for fold_poi, p_poi, name in zip(folds_poi, p_vals_poi, names):
+                texts.append(fig.add_annotation(x=fold_poi, y=p_poi, text=name, bgcolor=(
+                    '#69b8f0' if (p_poi > p) and any([(fold_poi < f[0]), (fold_poi > f[1])]) else 'white')))
+        figs.append(fig)
+    return figs[0], figs[1], figs[2]
 
 
 @app.callback(
@@ -423,7 +377,7 @@ def update_volcanoplot_pr(p_val, fc, input_gene):
     Input('gene_input', 'value'))
 def update_table(sort_by, input_gene):
     if len(sort_by) and input_gene:
-        poi = df_all[df_all['Gene'].str.contains(input_gene.upper()) == True].sort_values(
+        poi = df_selected[df_selected['Gene'].str.contains(input_gene.upper()) == True].sort_values(
             [col['column_id'] for col in sort_by],
             ascending=[
                 col['direction'] == 'asc'
@@ -433,7 +387,7 @@ def update_table(sort_by, input_gene):
         )
     elif input_gene:
         # No sort is applied
-        poi = df_all[df_all['Gene'].str.contains(input_gene.upper()) == True]
+        poi = df_selected[df_selected['Gene'].str.contains(input_gene.upper()) == True]
 
     else:
         return
