@@ -5,7 +5,6 @@ import dash_bio as dashbio
 import math
 from dash import html, dcc, dash_table, no_update
 import dash_bootstrap_components as dbc
-import numpy as np
 
 
 # Helper function to transform -log10 p-values
@@ -13,15 +12,9 @@ def power_to_transform(x):
     return 10 ** -x
 
 
-# and back to -log10
-def neg_log10(x):
-    return np.log10(1 / x)
-
-
 # Import Ubisite DDA Data
-df = pd.read_csv('UbiSiteDDA.csv')
-
-df['gene+pos'] = df['Gene names'] + "-K" + df['Positions within proteins'].astype(str)
+df = pd.read_csv('UbiSiteDIA.csv')
+df['gene+pos'] = df['Genes'] + "-K" + df['Positions within proteins'].astype(str)
 
 # Columns in data
 df_selected = df.drop(['Proteins', 'Protein names',
