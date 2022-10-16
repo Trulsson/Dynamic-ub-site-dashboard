@@ -16,38 +16,24 @@ def power_to_transform(x):
 df = pd.read_csv('UbiSiteDIA.csv')
 df['gene+pos'] = df['Genes'] + "-K" + df['Positions within proteins'].astype(str)
 
-# Columns in data
-df_selected = df.drop(['Proteins', 'Protein names',
-                       'TAK Significant (FDR=0.05 S0=0.1)', 'TAK q-value',
-                       'TAK all sites average',
-                       'MG Significant (FDR=0.05 S0=0.1)', 'MG q-value',
-                       'MG all sites average',
-                       'PR Significant (FDR=0.05 S0=0.1)', 'PR q-value',
-                       'PR all sites average', 'Ub Enzyme', 'Enzyme',
-                       'Protein in His10Ub', 'PEP', 'Delta score', ], axis=1).copy()
 
-df_selected.rename(columns={'TAK -Log p-value': 'TAK243 p', 'TAK Difference (log2)': 'TAK243 fc',
-                            'PR -Log p-value': 'PR619 p', 'PR Difference (log2)': 'PR619 fc',
-                            'MG -Log p-value': 'MG132 p', 'MG Difference (log2)': 'MG132 fc',
-                            'Score for localization': 'Pos. Score', 'Sequence window': 'Sequence',
-                            'Positions within proteins': 'Lysine', 'Gene names': 'Gene'
+df.rename(columns={'Score for localization': 'Pos. Score', 'ModifiedSequence': 'Sequence',
+                   'Positions within proteins': 'Lysine', 'Genes': 'Gene'
                             }, inplace=True)
-
-p_cols = ['TAK243 p', 'MG132 p', 'PR619 p']
-fc_cols = ['TAK243 fc', 'MG132 fc', 'PR619 fc']
+df_selected = df.drop_duplicates('Sequence', ignore_index=True)
+p_cols = ['MG132 p', 'PR619 p']
+fc_cols = ['MG132 fc', 'PR619 fc']
 
 # Transform p-values
 for col in p_cols:
     df_selected[col + '_x'] = df_selected[col].apply(lambda x: power_to_transform(x))
 df_selected.reset_index(inplace=True)
 
-df_tak, df_mg, df_pr = df_selected[df_selected['TAK243 fc'].notnull()], df_selected[df_selected['MG132 fc'].notnull()], \
-                       df_selected[df_selected['PR619 fc'].notnull()]
-df_tak.reset_index(inplace=True)
+df_mg, df_pr = df_selected[df_selected['MG132 p'].notnull()], df_selected[df_selected['PR619 p'].notnull()]
 df_mg.reset_index(inplace=True)
 df_pr.reset_index(inplace=True)
 
-p_cols_x = ['TAK243 p_x', 'MG132 p_x', 'PR619 p_x']
+p_cols_x = ['MG132 p_x', 'PR619 p_x']
 
 # Initialize dashboard
 app = dash.Dash(
@@ -59,7 +45,7 @@ app.layout = dbc.Container([
     # Title
     dbc.Row([
         dbc.Col([
-            html.H2('UbiSite DDA Data',
+            html.H2('UbiSite DIA Data',
                     className='text-center col-12'),
         ]),
     ]),
@@ -106,47 +92,6 @@ app.layout = dbc.Container([
     ], style={"height": "40px"}),
     # Sliders and Volcano
     dbc.Row([
-        # TAK
-        dbc.Col(
-            html.Div([
-                html.H4(children='Conjugation Inhibition',
-                        className='text-center text-primary, mb-4',
-                        style={'margin-right': '2px', 'margin-left': '2px'},
-                        id='tak-title'
-                        ),
-                dbc.Tooltip(
-                    "Inhibition by TAK-243 for 3h",
-                    target="tak-title",
-                    placement='top',
-                ),
-                # P-value slider TAK
-                html.H5('P-value'),
-                dcc.Slider(
-                    tooltip={'always_visible': True},
-                    id='tak-volcanoplot-input_p',
-                    min=0,
-                    max=max(df_tak['TAK243 p']),
-                    step=0.1,
-                    marks={i: {'label': str(i)} for i in range(0, math.ceil(max(df_tak['TAK243 p'])))},
-                    value=1.3
-                ),
-                # Fold Change slider TAK
-                html.H5('Fold Change'),
-                dcc.RangeSlider(
-                    tooltip={'always_visible': True},
-                    id='tak-volcanoplot-input_fc',
-                    min=min(df_tak['TAK243 fc']),
-                    max=max(df_tak['TAK243 fc']),
-                    step=0.1,
-                    marks={i: {'label': str(i)} for i in range(math.floor(min(df_tak['TAK243 fc'])),
-                                                               math.ceil(max(df_tak['TAK243 fc'])))},
-                    value=[-2, 2]
-                ),
-                # Volcano TAK
-                dcc.Graph(id='ubisite-tak-volcanoplot'),
-            ]),
-            md=12, lg=4
-        ),
         # MG
         dbc.Col(
             html.Div([
@@ -184,7 +129,7 @@ app.layout = dbc.Container([
                 # Volcano MG
                 dcc.Graph(id='ubisite-mg-volcanoplot')
             ]),
-            md=12, lg=4
+            md=12, lg=6
         ),
         # PR
         dbc.Col(
@@ -223,7 +168,7 @@ app.layout = dbc.Container([
                 # Volcano PR
                 dcc.Graph(id='ubisite-pr-volcanoplot')
             ]),
-            md=12, lg=4
+            md=12, lg=6
         )
     ]),
     # Data Table
@@ -233,8 +178,7 @@ app.layout = dbc.Container([
                 html.Br(),
                 dash_table.DataTable(
                     id='poi-table',
-                    columns=[{"name": i, "id": i} for i in ['Lysine', 'Gene', 'TAK243 p', 'TAK243 fc', 'MG132 p',
-                                                            'MG132 fc', 'PR619 p', 'PR619 fc', 'Score', 'Pos. Score',
+                    columns=[{"name": i, "id": i} for i in ['Gene', 'MG132 p', 'MG132 fc', 'PR619 p', 'PR619 fc',
                                                             'Sequence']],
                     style_table={'height': '300px', 'overflowY': 'auto'},
                     page_action='none',
@@ -246,17 +190,12 @@ app.layout = dbc.Container([
                     export_format='csv',
                     export_columns='all',
                     row_deletable=True,
-                    tooltip_header={'Lysine': 'Ub modified position within protein',
+                    tooltip_header={
                                     'Gene': 'Peptides that match to several proteins are separated by ";"',
-                                    'TAK243 p': 'Ub conjugation inhibition p-value (-log10)',
-                                    'TAK243 fc': 'Ub conjugation inhibition fold-change (log2)',
                                     'MG132 p': 'Proteasome inhibition p-value (-log10)',
                                     'MG132 fc': 'Proteasome inhibition fold-change (log2)',
                                     'PR619 p': 'Deubiquitinating enzyme inhibition p-value (-log10)',
                                     'PR619 fc': "Deubiquitinating enzyme inhibition fold-change (log2)",
-                                    'Score': 'Peptide Score: Higher value means higher confidence',
-                                    'Pos. Score': 'Position Score: Higher value means higher confidence in '
-                                                  'localization of modification within peptides',
                                     'Sequence': 'Amino acid sequence surrounding modification site'},
                     # Overflow into ellipsis
                     style_cell={
@@ -277,8 +216,17 @@ app.layout = dbc.Container([
                      href='https://github.com/Trulsson/Dynamic-ub-site-dashboard'),
         ]),
         dbc.Col([
-            html.A('Trulsson et al. Nat Commun 13. (2022)',
-                     href='https://www.nature.com/articles/s41467-022-30376-7'),
+            html.Div([
+                html.A('Trulsson et al. Nat Commun 13. (2022)', id='reference',
+                                     href='https://www.nature.com/articles/s41467-022-30376-7'),
+                dbc.Tooltip('Please cite the following article: '
+                            'Trulsson, F., Akimov, V., Robu, M. et al. Deubiquitinating enzymes and the proteasome '
+                            'regulate preferential sets of ubiquitin substrates. Nat Commun 13, 2736 (2022).',
+                            target="reference",
+                            placement='top',
+                            )
+            ])
+
         ]),
     ]), html.Br(),
 ],className="m-auto")
@@ -306,22 +254,19 @@ def check_input(input_gene, is_open):
 
 
 @app.callback(
-    Output('ubisite-tak-volcanoplot', 'figure'),
     Output('ubisite-mg-volcanoplot', 'figure'),
     Output('ubisite-pr-volcanoplot', 'figure'),
-    Input('tak-volcanoplot-input_p', 'value'),
-    Input('tak-volcanoplot-input_fc', 'value'),
     Input('mg-volcanoplot-input_p', 'value'),
     Input('mg-volcanoplot-input_fc', 'value'),
     Input('pr-volcanoplot-input_p', 'value'),
     Input('pr-volcanoplot-input_fc', 'value'),
     Input('gene_input', 'value')
 )
-def update_volcanoplot_tak(p_val_tak, fc_tak, p_val_mg, fc_mg, p_val_pr, fc_pr, input_gene):
-    p_val = [p_val_tak, p_val_mg, p_val_pr]
-    fc = [fc_tak, fc_mg, fc_pr]
+def update_volcanoplot_tak(p_val_mg, fc_mg, p_val_pr, fc_pr, input_gene):
+    p_val = [p_val_mg, p_val_pr]
+    fc = [fc_mg, fc_pr]
     # No NaN values in volcanoes
-    dfs = [df_tak, df_mg, df_pr]
+    dfs = [df_mg, df_pr]
     figs = []
     for p, f, data, p_col_x, fc_col, p_col in zip(p_val, fc, dfs, p_cols_x, fc_cols, p_cols):
         fig = dashbio.VolcanoPlot(
@@ -335,7 +280,7 @@ def update_volcanoplot_tak(p_val_tak, fc_tak, p_val_mg, fc_mg, p_val_pr, fc_pr, 
             genomewideline_value=p,
             highlight_color='#119DFF',
             col='#2A3F5F',
-            snp='Score',
+            snp='gene+pos',
         )
         # Hover data information, order of stack not the same as plot order. Not functional atm, default hover enabled.
         # single_gene_names = []
@@ -361,7 +306,7 @@ def update_volcanoplot_tak(p_val_tak, fc_tak, p_val_mg, fc_mg, p_val_pr, fc_pr, 
                 texts.append(fig.add_annotation(x=fold_poi, y=p_poi, text=name, bgcolor=(
                     '#69b8f0' if (p_poi > p) and any([(fold_poi < f[0]), (fold_poi > f[1])]) else 'white')))
         figs.append(fig)
-    return figs[0], figs[1], figs[2]
+    return figs[0], figs[1]
 
 
 @app.callback(
