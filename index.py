@@ -27,7 +27,7 @@ def display_page(pathname):
     if pathname == '/apps/dia':
         return dia.layout
     else:
-        return "/apps/dda"
+        return dda.layout
 
 
 if __name__ == '__main__':
