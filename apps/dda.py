@@ -1,10 +1,11 @@
 import pandas as pd
-import dash
 from dash.dependencies import Input, Output, State
 import dash_bio as dashbio
 import math
 from dash import html, dcc, dash_table, no_update
 import dash_bootstrap_components as dbc
+import pathlib
+from app import app
 
 
 # Helper function to transform -log10 p-values
@@ -13,7 +14,9 @@ def power_to_transform(x):
 
 
 # Import Ubisite DDA Data
-df = pd.read_csv('UbiSiteDDA.csv')
+PATH = pathlib.Path(__file__).parent
+DATA_PATH = PATH.joinpath("../datasets").resolve()
+df = pd.read_csv(DATA_PATH.joinpath('UbiSiteDDA.csv'))
 
 df['gene+pos'] = df['Gene names'] + "-K" + df['Positions within proteins'].astype(str)
 
@@ -50,13 +53,13 @@ df_pr.reset_index(inplace=True)
 
 p_cols_x = ['TAK243 p_x', 'MG132 p_x', 'PR619 p_x']
 
-# Initialize dashboard
-app = dash.Dash(
-    external_stylesheets=[dbc.themes.BOOTSTRAP]
-)
+# # Initialize dashboard
+# app = dash.Dash(
+#     external_stylesheets=[dbc.themes.BOOTSTRAP]
+# )
 
 # Layout of app
-app.layout = dbc.Container([
+layout = dbc.Container([
     # Title
     dbc.Row([
         dbc.Col([
@@ -388,6 +391,3 @@ def update_table(sort_by, input_gene):
 
     return poi.to_dict('records')
 
-
-if __name__ == '__main__':
-    app.run_server(debug=True)

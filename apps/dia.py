@@ -1,10 +1,11 @@
 import pandas as pd
-import dash
 from dash.dependencies import Input, Output, State
 import dash_bio as dashbio
 import math
 from dash import html, dcc, dash_table, no_update
 import dash_bootstrap_components as dbc
+import pathlib
+from app import app
 
 
 # Helper function to transform -log10 p-values
@@ -13,7 +14,9 @@ def power_to_transform(x):
 
 
 # Import Ubisite DDA Data
-df = pd.read_csv('UbiSiteDIA.csv')
+PATH = pathlib.Path(__file__).parent
+DATA_PATH = PATH.joinpath("../datasets").resolve()
+df = pd.read_csv(DATA_PATH.joinpath('UbiSiteDIA.csv'))
 df['gene+pos'] = df['Genes'] + "-K" + df['Positions within proteins'].astype(str)
 
 
@@ -35,13 +38,13 @@ df_pr.reset_index(inplace=True)
 
 p_cols_x = ['MG132 p_x', 'PR619 p_x']
 
-# Initialize dashboard
-app = dash.Dash(
-    external_stylesheets=[dbc.themes.BOOTSTRAP]
-)
+# # Initialize dashboard
+# app = dash.Dash(
+#     external_stylesheets=[dbc.themes.BOOTSTRAP]
+# )
 
 # Layout of app
-app.layout = dbc.Container([
+layout = dbc.Container([
     # Title
     dbc.Row([
         dbc.Col([
@@ -54,11 +57,11 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             html.Div([
-                dcc.Input(id="gene_input", type="text", placeholder="Enter Gene Name",
+                dcc.Input(id="gene_input-dia", type="text", placeholder="Enter Gene Name",
                           debounce=True, className='col-3'),
                 dbc.Tooltip(
                     "Search for identified Ubiquitin sites in your Gene of interest in this dataset",
-                    target="gene_input",
+                    target="gene_input_dia",
                     placement='top',
                 )
             ])
@@ -75,7 +78,7 @@ app.layout = dbc.Container([
                     fade=False,
                     color="danger",
                     dismissable=True,
-                    id='err',
+                    id='err-dia',
                 ),
                 dbc.Alert(
                     html.H6("Gene Name found", className='text-center'),
@@ -84,7 +87,7 @@ app.layout = dbc.Container([
                     fade=True,
                     color="success",
                     dismissable=True,
-                    id='success',
+                    id='success-dia',
                     duration=2000,
                 )
             ])
@@ -107,7 +110,7 @@ app.layout = dbc.Container([
                 html.H5('P-value'),
                 dcc.Slider(
                     tooltip={'always_visible': True},
-                    id='mg-volcanoplot-input_p',
+                    id='mg-volcanoplot-input_p-dia',
                     min=0,
                     max=max(df_mg['MG132 p']),
                     step=0.1,
@@ -118,7 +121,7 @@ app.layout = dbc.Container([
                 html.H5('Fold Change'),
                 dcc.RangeSlider(
                     tooltip={'always_visible': True},
-                    id='mg-volcanoplot-input_fc',
+                    id='mg-volcanoplot-input_fc-dia',
                     min=min(df_mg['MG132 fc']),
                     max=max(df_mg['MG132 fc']),
                     step=0.1,
@@ -127,7 +130,7 @@ app.layout = dbc.Container([
                     value=[-2, 2]
                 ),
                 # Volcano MG
-                dcc.Graph(id='ubisite-mg-volcanoplot')
+                dcc.Graph(id='ubisite-mg-volcanoplot-dia')
             ]),
             md=12, lg=6
         ),
@@ -146,7 +149,7 @@ app.layout = dbc.Container([
                 html.H5('P-value'),
                 dcc.Slider(
                     tooltip={'always_visible': True},
-                    id='pr-volcanoplot-input_p',
+                    id='pr-volcanoplot-input_p-dia',
                     min=0,
                     max=max(df_pr['PR619 p']),
                     step=0.1,
@@ -157,7 +160,7 @@ app.layout = dbc.Container([
                 html.H5('Fold Change'),
                 dcc.RangeSlider(
                     tooltip={'always_visible': True},
-                    id='pr-volcanoplot-input_fc',
+                    id='pr-volcanoplot-input_fc-dia',
                     min=min(df_pr['PR619 fc']),
                     max=max(df_pr['PR619 fc']),
                     step=0.1,
@@ -166,7 +169,7 @@ app.layout = dbc.Container([
                     value=[-2, 2]
                 ),
                 # Volcano PR
-                dcc.Graph(id='ubisite-pr-volcanoplot')
+                dcc.Graph(id='ubisite-pr-volcanoplot-dia')
             ]),
             md=12, lg=6
         )
@@ -177,7 +180,7 @@ app.layout = dbc.Container([
             html.Div([
                 html.Br(),
                 dash_table.DataTable(
-                    id='poi-table',
+                    id='poi-table-dia',
                     columns=[{"name": i, "id": i} for i in ['Gene', 'MG132 p', 'MG132 fc', 'PR619 p', 'PR619 fc',
                                                             'Sequence']],
                     style_table={'height': '300px', 'overflowY': 'auto'},
@@ -233,11 +236,11 @@ app.layout = dbc.Container([
 
 
 @app.callback(
-    Output('err', 'is_open'),
-    Output('success', 'is_open'),
-    Output('gene_input', 'value'),
-    Input('gene_input', 'value'),
-    State("err", "is_open")
+    Output('err-dia', 'is_open'),
+    Output('success-dia', 'is_open'),
+    Output('gene_input-dia', 'value'),
+    Input('gene_input-dia', 'value'),
+    State("err-dia", "is_open")
 )
 def check_input(input_gene, is_open):
     # Makes sure there is an input and then checks if
@@ -254,13 +257,13 @@ def check_input(input_gene, is_open):
 
 
 @app.callback(
-    Output('ubisite-mg-volcanoplot', 'figure'),
-    Output('ubisite-pr-volcanoplot', 'figure'),
-    Input('mg-volcanoplot-input_p', 'value'),
-    Input('mg-volcanoplot-input_fc', 'value'),
-    Input('pr-volcanoplot-input_p', 'value'),
-    Input('pr-volcanoplot-input_fc', 'value'),
-    Input('gene_input', 'value')
+    Output('ubisite-mg-volcanoplot-dia', 'figure'),
+    Output('ubisite-pr-volcanoplot-dia', 'figure'),
+    Input('mg-volcanoplot-input_p-dia', 'value'),
+    Input('mg-volcanoplot-input_fc-dia', 'value'),
+    Input('pr-volcanoplot-input_p-dia', 'value'),
+    Input('pr-volcanoplot-input_fc-dia', 'value'),
+    Input('gene_input-dia', 'value')
 )
 def update_volcanoplot_tak(p_val_mg, fc_mg, p_val_pr, fc_pr, input_gene):
     p_val = [p_val_mg, p_val_pr]
@@ -310,9 +313,9 @@ def update_volcanoplot_tak(p_val_mg, fc_mg, p_val_pr, fc_pr, input_gene):
 
 
 @app.callback(
-    Output('poi-table', "data"),
-    Input('poi-table', "sort_by"),
-    Input('gene_input', 'value'))
+    Output('poi-table-dia', "data"),
+    Input('poi-table-dia', "sort_by"),
+    Input('gene_input-dia', 'value'))
 def update_table(sort_by, input_gene):
     if len(sort_by) and input_gene:
         poi = df_selected[df_selected['Gene'].str.contains(input_gene.upper()) == True].sort_values(
@@ -332,6 +335,3 @@ def update_table(sort_by, input_gene):
 
     return poi.to_dict('records')
 
-
-if __name__ == '__main__':
-    app.run_server(debug=True)
